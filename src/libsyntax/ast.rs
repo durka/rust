@@ -905,6 +905,15 @@ impl fmt::Debug for Expr {
     }
 }
 
+/// Limit types of a range (inclusive or exclusive)
+#[derive(Copy, Clone, PartialEq, Eq, RustcEncodable, RustcDecodable, Hash, Debug)]
+pub enum RangeLimits {
+    /// Inclusive at the beginning, exclusive at the end
+    HalfOpen,
+    /// Inclusive at the beginning and end
+    Closed,
+}
+
 #[derive(Clone, PartialEq, Eq, RustcEncodable, RustcDecodable, Hash, Debug)]
 pub enum Expr_ {
     /// A `box x` expression.
@@ -993,8 +1002,8 @@ pub enum Expr_ {
     ExprTupField(P<Expr>, Spanned<usize>),
     /// An indexing operation (`foo[2]`)
     ExprIndex(P<Expr>, P<Expr>),
-    /// A range (`1..2`, `1..`, or `..2`)
-    ExprRange(Option<P<Expr>>, Option<P<Expr>>),
+    /// A range (`1..2`, `1..`, `..2`, `1...2`, `1...`, `...2`)
+    ExprRange(Option<P<Expr>>, Option<P<Expr>>, RangeLimits),
 
     /// Variable reference, possibly containing `::` and/or type
     /// parameters, e.g. foo::bar::<baz>.
