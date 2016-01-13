@@ -1981,7 +1981,6 @@ impl<'tcx> ctxt<'tcx> {
             hir::ExprCall(..) |
             hir::ExprMethodCall(..) |
             hir::ExprStruct(..) |
-            hir::ExprRange(..) |
             hir::ExprTup(..) |
             hir::ExprIf(..) |
             hir::ExprMatch(..) |
