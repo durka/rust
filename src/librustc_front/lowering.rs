@@ -65,6 +65,7 @@ use hir;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::iter;
 use syntax::ast::*;
 use syntax::attr::{ThinAttributes, ThinAttributesExt};
 use syntax::ext::mtwt;
@@ -1207,9 +1208,58 @@ pub fn lower_expr(lctx: &LoweringContext, e: &Expr) -> P<hir::Expr> {
             ExprIndex(ref el, ref er) => {
                 hir::ExprIndex(lower_expr(lctx, el), lower_expr(lctx, er))
             }
-            ExprRange(ref e1, ref e2) => {
-                hir::ExprRange(e1.as_ref().map(|x| lower_expr(lctx, x)),
-                               e2.as_ref().map(|x| lower_expr(lctx, x)))
+            ExprRange(ref e1, ref e2, lims) => {
+                fn make_struct(lctx: &LoweringContext, span: Span, path: &[&str], fields: Vec<(&str, &P<Expr>)>) -> P<hir::Expr> {
+                    let strs = std_path(lctx, &iter::once(&"ops").chain(path).map(|&x| x).collect::<Vec<_>>());
+
+                    let structpath = path_global(span, strs);
+
+                    if fields.len() == 0 {
+                        expr_path(lctx,
+                                  structpath,
+                                  None)
+                    } else {
+                        expr_struct(lctx,
+                                    span,
+                                    structpath,
+                                    fields.into_iter().map(|(s, e)| {
+                                        field(token::intern(s), lower_expr(lctx, &**e), span)
+                                    }).collect(),
+                                    None,
+                                    None)
+                    }
+                }
+
+                return cache_ids(lctx, e.id, |lctx| {
+                    match (e1, e2, lims) {
+                        (&None,         &None,         RangeLimits::HalfOpen) => make_struct(lctx,
+                                                                                             e.span,
+                                                                                             &["RangeFull"],
+                                                                                             vec![]),
+                        (&None,         &None,         RangeLimits::Closed)   => panic!("No such thing as RangeFullInclusive"),
+                        (&None,         &Some(ref e2), RangeLimits::HalfOpen) => make_struct(lctx,
+                                                                                             e.span,
+                                                                                             &["RangeTo"],
+                                                                                             vec![("end", e2)]),
+                        (&None,         &Some(ref e2), RangeLimits::Closed)   => make_struct(lctx,
+                                                                                             e.span,
+                                                                                             &["RangeToInclusive"],
+                                                                                             vec![("end", e2)]),
+                        (&Some(ref e1), &None,         RangeLimits::HalfOpen) => make_struct(lctx,
+                                                                                             e.span,
+                                                                                             &["RangeFrom"],
+                                                                                             vec![("start", e1)]),
+                        (&Some(_),      &None,         RangeLimits::Closed)   => panic!("No such thing as RangeFromInclusive"),
+                        (&Some(ref e1), &Some(ref e2), RangeLimits::HalfOpen) => make_struct(lctx,
+                                                                                             e.span,
+                                                                                             &["Range"],
+                                                                                             vec![("start", e1), ("end", e2)]),
+                        (&Some(ref e1), &Some(ref e2), RangeLimits::Closed)   => make_struct(lctx,
+                                                                                             e.span,
+                                                                                             &["RangeInclusive", "NonEmpty"],
+                                                                                             vec![("start", e1), ("end", e2)]),
+                    }
+                });
             }
             ExprPath(ref qself, ref path) => {
                 let hir_qself = qself.as_ref().map(|&QSelf { ref ty, position }| {
@@ -1626,6 +1676,17 @@ fn arm(pats: hir::HirVec<P<hir::Pat>>, expr: P<hir::Expr>) -> hir::Arm {
     }
 }
 
+fn field(name: Name, expr: P<hir::Expr>, span: Span) -> hir::Field {
+    hir::Field {
+        name: Spanned {
+            node: name,
+            span: span,
+        },
+        span: span,
+        expr: expr,
+    }
+}
+
 fn expr_break(lctx: &LoweringContext, span: Span,
               attrs: ThinAttributes) -> P<hir::Expr> {
     expr(lctx, span, hir::ExprBreak(None), attrs)
@@ -1673,6 +1734,15 @@ fn expr_block(lctx: &LoweringContext, b: P<hir::Block>,
 fn expr_tuple(lctx: &LoweringContext, sp: Span, exprs: hir::HirVec<P<hir::Expr>>,
               attrs: ThinAttributes) -> P<hir::Expr> {
     expr(lctx, sp, hir::ExprTup(exprs), attrs)
+}
+
+fn expr_struct(lctx: &LoweringContext,
+               sp: Span,
+               path: hir::Path,
+               fields: hir::HirVec<hir::Field>,
+               e: Option<P<hir::Expr>>,
+               attrs: ThinAttributes) -> P<hir::Expr> {
+    expr(lctx, sp, hir::ExprStruct(path, fields, e), attrs)
 }
 
 fn expr(lctx: &LoweringContext, span: Span, node: hir::Expr_,
