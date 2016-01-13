@@ -1530,6 +1530,49 @@ impl<Idx: fmt::Debug> fmt::Debug for RangeTo<Idx> {
     }
 }
 
+/// An inclusive range which is bounded at both ends.
+#[derive(Copy, Clone, PartialEq, Eq)]
+#[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
+pub enum RangeInclusive<Idx> {
+    /// Empty range (iteration has finished)
+    Empty,
+    /// Non-empty range (iteration will yield value(s))
+    NonEmpty { // FIXME bikeshed variant name
+        /// The lower bound of the range (inclusive).
+        start: Idx,
+        /// The upper bound of the range (inclusive).
+        end: Idx,
+    },
+}
+
+#[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
+impl<Idx: fmt::Debug> fmt::Debug for RangeInclusive<Idx> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use self::RangeInclusive::*;
+
+        match *self {
+            Empty => write!(fmt, "[empty range]"),
+            NonEmpty { ref start, ref end } => write!(fmt, "{:?}...{:?}", start, end),
+        }
+    }
+}
+
+/// An inclusive range which is only bounded above.
+#[derive(Copy, Clone, PartialEq, Eq)]
+#[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
+pub struct RangeToInclusive<Idx> {
+    /// The upper bound of the range (inclusive)
+    #[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
+    pub end: Idx,
+}
+
+#[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
+impl<Idx: fmt::Debug> fmt::Debug for RangeToInclusive<Idx> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "...{:?}", self.end)
+    }
+}
+
 /// The `Deref` trait is used to specify the functionality of dereferencing
 /// operations, like `*v`.
 ///
