@@ -1209,8 +1209,13 @@ pub fn lower_expr(lctx: &LoweringContext, e: &Expr) -> P<hir::Expr> {
                 hir::ExprIndex(lower_expr(lctx, el), lower_expr(lctx, er))
             }
             ExprRange(ref e1, ref e2, lims) => {
-                fn make_struct(lctx: &LoweringContext, span: Span, path: &[&str], fields: Vec<(&str, &P<Expr>)>) -> P<hir::Expr> {
-                    let strs = std_path(lctx, &iter::once(&"ops").chain(path).map(|&x| x).collect::<Vec<_>>());
+                fn make_struct(lctx: &LoweringContext,
+                               span: Span,
+                               path: Vec<&str>,
+                               fields: Vec<(&str, &P<Expr>)>) -> P<hir::Expr> {
+                    let strs = std_path(lctx, &iter::once("ops")
+                                                    .chain(path)
+                                                    .collect::<Vec<_>>());
 
                     let structpath = path_global(span, strs);
 
@@ -1231,34 +1236,28 @@ pub fn lower_expr(lctx: &LoweringContext, e: &Expr) -> P<hir::Expr> {
                 }
 
                 return cache_ids(lctx, e.id, |lctx| {
-                    match (e1, e2, lims) {
-                        (&None,         &None,         RangeLimits::HalfOpen) => make_struct(lctx,
-                                                                                             e.span,
-                                                                                             &["RangeFull"],
-                                                                                             vec![]),
-                        (&None,         &None,         RangeLimits::Closed)   => panic!("No such thing as RangeFullInclusive"),
-                        (&None,         &Some(ref e2), RangeLimits::HalfOpen) => make_struct(lctx,
-                                                                                             e.span,
-                                                                                             &["RangeTo"],
-                                                                                             vec![("end", e2)]),
-                        (&None,         &Some(ref e2), RangeLimits::Closed)   => make_struct(lctx,
-                                                                                             e.span,
-                                                                                             &["RangeToInclusive"],
-                                                                                             vec![("end", e2)]),
-                        (&Some(ref e1), &None,         RangeLimits::HalfOpen) => make_struct(lctx,
-                                                                                             e.span,
-                                                                                             &["RangeFrom"],
-                                                                                             vec![("start", e1)]),
-                        (&Some(_),      &None,         RangeLimits::Closed)   => panic!("No such thing as RangeFromInclusive"),
-                        (&Some(ref e1), &Some(ref e2), RangeLimits::HalfOpen) => make_struct(lctx,
-                                                                                             e.span,
-                                                                                             &["Range"],
-                                                                                             vec![("start", e1), ("end", e2)]),
-                        (&Some(ref e1), &Some(ref e2), RangeLimits::Closed)   => make_struct(lctx,
-                                                                                             e.span,
-                                                                                             &["RangeInclusive", "NonEmpty"],
-                                                                                             vec![("start", e1), ("end", e2)]),
-                    }
+                    use syntax::ast::RangeLimits::*;
+                    make_struct(lctx,
+                                e.span,
+                                match (e1.is_some(), e2.is_some(), lims) {
+                                    (false, false, HalfOpen) => vec!["RangeFull"],
+                                    (true,  false, HalfOpen) => vec!["RangeFrom"],
+                                    (false, true,  HalfOpen) => vec!["RangeTo"],
+                                    (true,  true,  HalfOpen) => vec!["Range"],
+                                    (false, true,  Closed)   => vec!["RangeToInclusive"],
+                                    (true,  true,  Closed)   => vec!["RangeInclusive", "NonEmpty"],
+                                    _ => panic!("impossible range in AST"),
+                                },
+                                {
+                                    let mut v = vec![];
+                                    if let Some(ref e1) = *e1 {
+                                        v.push(("start", e1));
+                                    }
+                                    if let Some(ref e2) = *e2 {
+                                        v.push(("end",   e2));
+                                    }
+                                    v
+                                })
                 });
             }
             ExprPath(ref qself, ref path) => {

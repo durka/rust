@@ -4360,7 +4360,9 @@ macro_rules! range_exact_iter_impl {
         #[stable(feature = "rust1", since = "1.0.0")]
         impl ExactSizeIterator for ops::Range<$t> { }
 
-        #[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
+        #[unstable(feature = "inclusive_range",
+                   reason = "recently added, follows RFC",
+                   issue = "28237")]
         impl ExactSizeIterator for ops::RangeInclusive<$t> { }
     )*)
 }
@@ -4437,7 +4439,7 @@ impl<A: Step + One> Iterator for ops::RangeInclusive<A> where
 
         // this function has a sort of odd structure due to borrowck issues
         // we may need to mem::replace self, so borrows of self.start and self.end need to end early
-        
+
         let (finishing, n) = match *self {
             Empty => return None, // empty iterators yield no values
 
@@ -4486,7 +4488,7 @@ impl<A: Step + One> DoubleEndedIterator for ops::RangeInclusive<A> where
 
         // this function has a sort of odd structure due to borrowck issues
         // we may need to mem::replace self, so borrows of self.start and self.end need to end early
-        
+
         let (finishing, n) = match *self {
             Empty => return None, // empty iterators yield no values
 

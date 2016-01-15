@@ -2934,7 +2934,13 @@ impl<'a> Parser<'a> {
          } else {
             None
         };
-        let r = self.mk_range(None, opt_end, if tok == token::DotDot { RangeLimits::HalfOpen } else { RangeLimits::Closed });
+        let r = self.mk_range(None,
+                              opt_end,
+                              if tok == token::DotDot {
+                                  RangeLimits::HalfOpen
+                              } else {
+                                  RangeLimits::Closed
+                              });
         Ok(self.mk_expr(lo, hi, r, attrs))
     }
 

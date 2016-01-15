@@ -174,7 +174,8 @@ impl AssocOp {
         match *self {
             Less | Greater | LessEqual | GreaterEqual | Equal | NotEqual => true,
             Inplace | Assign | AssignOp(_) | As | Multiply | Divide | Modulus | Add | Subtract |
-            ShiftLeft | ShiftRight | BitAnd | BitXor | BitOr | LAnd | LOr | DotDot | DotDotDot | Colon => false
+            ShiftLeft | ShiftRight | BitAnd | BitXor | BitOr | LAnd | LOr |
+            DotDot | DotDotDot | Colon => false
         }
     }
 
