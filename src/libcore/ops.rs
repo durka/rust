@@ -67,8 +67,11 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use marker::{Sized, Unsize};
+use cmp::PartialOrd;
 use fmt;
+use convert::From;
+use marker::{Sized, Unsize};
+use num::One;
 
 /// The `Drop` trait is used to run some code when a value goes out of scope.
 /// This is sometimes called a 'destructor'.
@@ -1535,7 +1538,10 @@ impl<Idx: fmt::Debug> fmt::Debug for RangeTo<Idx> {
 #[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
 pub enum RangeInclusive<Idx> {
     /// Empty range (iteration has finished)
-    Empty,
+    Empty {
+        /// The point at which iteration finished
+        at: Idx
+    },
     /// Non-empty range (iteration will yield value(s))
     NonEmpty { // FIXME bikeshed variant name
         /// The lower bound of the range (inclusive).
@@ -1551,8 +1557,21 @@ impl<Idx: fmt::Debug> fmt::Debug for RangeInclusive<Idx> {
         use self::RangeInclusive::*;
 
         match *self {
-            Empty => write!(fmt, "[empty range]"),
+            Empty { ref at } => write!(fmt, "[empty range @ {:?}]", at),
             NonEmpty { ref start, ref end } => write!(fmt, "{:?}...{:?}", start, end),
+        }
+    }
+}
+
+#[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
+impl<Idx: PartialOrd + One + Sub<Output=Idx>> From<Range<Idx>> for RangeInclusive<Idx> {
+    fn from(range: Range<Idx>) -> RangeInclusive<Idx> {
+        use self::RangeInclusive::*;
+
+        if range.start < range.end {
+            NonEmpty { start: range.start, end: range.end - Idx::one() }
+        } else {
+            Empty { at: range.start } // FIXME range.start or range.end?
         }
     }
 }

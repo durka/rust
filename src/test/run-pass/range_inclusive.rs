@@ -57,7 +57,7 @@ pub fn main() {
     short.next();
     assert_eq!(long.size_hint(), (255, Some(255)));
     assert_eq!(short.size_hint(), (0, Some(0)));
-    assert_eq!(short, RangeInclusive::Empty);
+    assert_eq!(short, RangeInclusive::Empty { at: 42 });
 
     assert_eq!(long.len(), 255);
     assert_eq!(short.len(), 0);
@@ -72,5 +72,15 @@ pub fn main() {
     for i in 3...251 {
         assert_eq!(long.next(), Some(i));
     }
-    assert_eq!(long, RangeInclusive::Empty);
+    assert_eq!(long, RangeInclusive::Empty { at: 251 });
+
+    // conversion
+    assert_eq!(0...9, (0..10).into());
+    assert_eq!(0...0, (0..1).into());
+    assert_eq!(RangeInclusive::Empty { at: 1 }, (1..0).into());
+
+    // output
+    assert_eq!(format!("{:?}", 0...10), "0...10");
+    assert_eq!(format!("{:?}", ...10), "...10");
+    assert_eq!(format!("{:?}", long), "[empty range @ 251]");
 }

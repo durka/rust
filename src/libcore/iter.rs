@@ -4438,24 +4438,32 @@ impl<A: Step + One> Iterator for ops::RangeInclusive<A> where
         use ops::RangeInclusive::*;
 
         // this function has a sort of odd structure due to borrowck issues
-        // we may need to mem::replace self, so borrows of self.start and self.end need to end early
+        // we may need to replace self, so borrows of self.start and self.end need to end early
 
         let (finishing, n) = match *self {
-            Empty => return None, // empty iterators yield no values
+            Empty { .. } => return None, // empty iterators yield no values
 
-            NonEmpty { ref mut start, ref end } => {
+            NonEmpty { ref mut start, ref mut end } => {
                 // this part is the same as <Range as Iterator>::next
-                let mut n = &*start + &A::one();
+                let one = A::one();
+                let mut n = &*start + &one;
                 mem::swap(&mut n, start);
 
-                (n == *end, // are we done yet?
-                 n)         // the value to output
+                // if the iterator is done iterating, it will change from NonEmpty to Empty
+                // to avoid unnecessary drops or clones, we'll reuse either start or end (they are
+                // equal now, so it doesn't matter which)
+                // to pull out end, we need to swap something back in -- use the previously created
+                // A::one() as a dummy value
+
+                (if n == *end { Some(mem::replace(end, one)) } else { None },
+                    // ^ are we done yet?
+                 n) // < the value to output
             }
         };
 
         // turn into an empty iterator if this is the last value
-        if finishing {
-            mem::replace(self, Empty);
+        if let Some(end) = finishing {
+            *self = Empty { at: end };
         }
 
         Some(n)
@@ -4466,7 +4474,7 @@ impl<A: Step + One> Iterator for ops::RangeInclusive<A> where
         use ops::RangeInclusive::*;
 
         match *self {
-            Empty => (0, Some(0)),
+            Empty { .. } => (0, Some(0)),
 
             NonEmpty { ref start, ref end } =>
                 match Step::steps_between(start, end, &A::one()) {
@@ -4486,25 +4494,23 @@ impl<A: Step + One> DoubleEndedIterator for ops::RangeInclusive<A> where
     fn next_back(&mut self) -> Option<A> {
         use ops::RangeInclusive::*;
 
-        // this function has a sort of odd structure due to borrowck issues
-        // we may need to mem::replace self, so borrows of self.start and self.end need to end early
+        // see Iterator::next for comments
 
         let (finishing, n) = match *self {
-            Empty => return None, // empty iterators yield no values
+            Empty { .. } => return None,
 
-            NonEmpty { ref start, ref mut end } => {
-                // this part is the similar to <Range as Iterator>::next
-                let mut n = &*end - &A::one();
+            NonEmpty { ref mut start, ref mut end } => {
+                let one = A::one();
+                let mut n = &*end - &one;
                 mem::swap(&mut n, end);
 
-                (n == *start, // are we done yet?
-                 n)           // the value to output
+                (if n == *start { Some(mem::replace(start, one)) } else { None },
+                 n)
             }
         };
 
-        // turn into an empty iterator if this is the last value
-        if finishing {
-            mem::replace(self, Empty);
+        if let Some(start) = finishing {
+            *self = Empty { at: start };
         }
 
         Some(n)
