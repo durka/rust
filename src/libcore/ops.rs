@@ -1543,7 +1543,7 @@ pub enum RangeInclusive<Idx> {
         at: Idx
     },
     /// Non-empty range (iteration will yield value(s))
-    NonEmpty { // FIXME bikeshed variant name
+    NonEmpty {
         /// The lower bound of the range (inclusive).
         start: Idx,
         /// The upper bound of the range (inclusive).
@@ -1569,9 +1569,14 @@ impl<Idx: PartialOrd + One + Sub<Output=Idx>> From<Range<Idx>> for RangeInclusiv
         use self::RangeInclusive::*;
 
         if range.start < range.end {
-            NonEmpty { start: range.start, end: range.end - Idx::one() }
+            NonEmpty {
+                start: range.start,
+                end: range.end - Idx::one() // can't underflow because end > start >= MIN
+            }
         } else {
-            Empty { at: range.start } // FIXME range.start or range.end?
+            Empty {
+                at: range.start
+            }
         }
     }
 }
@@ -1593,6 +1598,8 @@ impl<Idx: fmt::Debug> fmt::Debug for RangeToInclusive<Idx> {
         write!(fmt, "...{:?}", self.end)
     }
 }
+
+// RangeToInclusive<Idx> cannot impl From<RangeTo<Idx>> because underflow would be possible with (..0).into()
 
 /// The `Deref` trait is used to specify the functionality of dereferencing
 /// operations, like `*v`.

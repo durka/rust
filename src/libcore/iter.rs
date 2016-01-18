@@ -4441,23 +4441,26 @@ impl<A: Step + One> Iterator for ops::RangeInclusive<A> where
         // we may need to replace self, so borrows of self.start and self.end need to end early
 
         let (finishing, n) = match *self {
-            Empty { .. } => return None, // empty iterators yield no values
+            Empty { .. } => (None, None), // empty iterators yield no values
 
             NonEmpty { ref mut start, ref mut end } => {
-                // this part is the same as <Range as Iterator>::next
                 let one = A::one();
-                let mut n = &*start + &one;
-                mem::swap(&mut n, start);
+                if start <= end {
+                    let mut n = &*start + &one;
+                    mem::swap(&mut n, start);
 
-                // if the iterator is done iterating, it will change from NonEmpty to Empty
-                // to avoid unnecessary drops or clones, we'll reuse either start or end (they are
-                // equal now, so it doesn't matter which)
-                // to pull out end, we need to swap something back in -- use the previously created
-                // A::one() as a dummy value
+                    // if the iterator is done iterating, it will change from NonEmpty to Empty
+                    // to avoid unnecessary drops or clones, we'll reuse either start or end (they are
+                    // equal now, so it doesn't matter which)
+                    // to pull out end, we need to swap something back in -- use the previously created
+                    // A::one() as a dummy value
 
-                (if n == *end { Some(mem::replace(end, one)) } else { None },
+                    (if n == *end { Some(mem::replace(end, one)) } else { None },
                     // ^ are we done yet?
-                 n) // < the value to output
+                    Some(n)) // < the value to output
+                } else {
+                    (Some(mem::replace(start, one)), None)
+                }
             }
         };
 
@@ -4466,7 +4469,7 @@ impl<A: Step + One> Iterator for ops::RangeInclusive<A> where
             *self = Empty { at: end };
         }
 
-        Some(n)
+        n
     }
 
     #[inline]

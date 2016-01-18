@@ -35,6 +35,15 @@ pub fn main() {
     }
     assert_eq!(count, 55);
 
+    /* FIXME
+    let mut count = 0;
+    for i in (0_usize...10).step_by(2) {
+        assert!(i >= 0 && i <= 10 && i % 2 == 0);
+        count += i;
+    }
+    assert_eq!(count, 30);
+    */
+
     let _ = 0_usize...4+4-3;
     let _ = 0...foo();
 
@@ -73,6 +82,11 @@ pub fn main() {
         assert_eq!(long.next(), Some(i));
     }
     assert_eq!(long, RangeInclusive::Empty { at: 251 });
+
+    // what happens if you have a nonsense range?
+    let mut nonsense = 10...5;
+    assert_eq!(nonsense.next(), None);
+    assert_eq!(nonsense, RangeInclusive::Empty { at: 10 });
 
     // conversion
     assert_eq!(0...9, (0..10).into());
