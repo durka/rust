@@ -40,8 +40,7 @@ use cmp;
 use default::Default;
 use intrinsics::assume;
 use iter::*;
-use ops::{FnMut, self, Index};
-use ops::RangeFull;
+use ops::{FnMut, self};
 use option::Option;
 use option::Option::{None, Some};
 use result::Result;
@@ -510,105 +509,78 @@ impl<T> ops::IndexMut<usize> for [T] {
 
 #[inline(never)]
 #[cold]
-fn slice_index_len_fail(index: usize, len: usize) -> ! {
-    panic!("index {} out of range for slice of length {}", index, len);
+fn slice_index_len_fail(index: ops::RangeBound<usize>, len: usize) -> ! {
+    let (index, tag) = match index {
+        ops::RangeBound::Inclusive(&i) => (i, "inclusive"),
+        ops::RangeBound::Exclusive(&i) => (i, "exclusive"),
+        _ => unreachable!(),
+    };
+    panic!("index {} ({}) out of range for slice of length {}", index, tag, len);
 }
 
 #[inline(never)]
 #[cold]
-fn slice_index_order_fail(index: usize, end: usize) -> ! {
-    panic!("slice index starts at {} but ends at {}", index, end);
+fn slice_index_order_fail(start: ops::RangeBound<usize>, end: ops::RangeBound<usize>) -> ! {
+    let (start, stag) = match start {
+        ops::RangeBound::Inclusive(&i) => (i, "inclusive"),
+        ops::RangeBound::Exclusive(&i) => (i, "exclusive"),
+        _ => unreachable!(),
+    };
+    let (end, etag) = match end {
+        ops::RangeBound::Inclusive(&i) => (i, "inclusive"),
+        ops::RangeBound::Exclusive(&i) => (i, "exclusive"),
+        _ => unreachable!(),
+    };
+    panic!("slice index starts at {} ({}) but ends at {} ({})", start, stag, end, etag);
 }
 
 // FIXME implement indexing with inclusive ranges
 
+#[inline]
+fn check_indices<R: ops::RangeArgument<usize>>(index: R, len: usize) -> (usize, usize) {
+    let start = index.start()
+        .bounds_check(len, 0)
+        .unwrap_or_else(|e| slice_index_len_fail(e, len));
+    let end = index.end()
+        .bounds_check(len, len)
+        .unwrap_or_else(|e| slice_index_len_fail(e, len));
+
+    if end < start {
+        slice_index_order_fail(index.start(), index.end());
+    }
+    
+    (start, end)
+}
+
 #[stable(feature = "rust1", since = "1.0.0")]
-impl<T> ops::Index<ops::Range<usize>> for [T] {
+impl<T, R: ops::RangeArgument<usize>> ops::Index<R> for [T] {
     type Output = [T];
 
     #[inline]
-    fn index(&self, index: ops::Range<usize>) -> &[T] {
-        if index.start > index.end {
-            slice_index_order_fail(index.start, index.end);
-        } else if index.end > self.len() {
-            slice_index_len_fail(index.end, self.len());
-        }
+    fn index(&self, index: R) -> &[T] {
+        let (start, end) = check_indices(index, self.len());
         unsafe {
             from_raw_parts (
-                self.as_ptr().offset(index.start as isize),
-                index.end - index.start
+                self.as_ptr().offset(start as isize),
+                end - start
             )
         }
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<T> ops::Index<ops::RangeTo<usize>> for [T] {
-    type Output = [T];
-
-    #[inline]
-    fn index(&self, index: ops::RangeTo<usize>) -> &[T] {
-        self.index(ops::Range{ start: 0, end: index.end })
-    }
-}
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<T> ops::Index<ops::RangeFrom<usize>> for [T] {
-    type Output = [T];
-
-    #[inline]
-    fn index(&self, index: ops::RangeFrom<usize>) -> &[T] {
-        self.index(ops::Range{ start: index.start, end: self.len() })
-    }
-}
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<T> ops::Index<RangeFull> for [T] {
-    type Output = [T];
-
-    #[inline]
-    fn index(&self, _index: RangeFull) -> &[T] {
-        self
-    }
-}
 
 #[stable(feature = "rust1", since = "1.0.0")]
-impl<T> ops::IndexMut<ops::Range<usize>> for [T] {
+impl<T, R: ops::RangeArgument<usize>> ops::IndexMut<R> for [T] {
     #[inline]
-    fn index_mut(&mut self, index: ops::Range<usize>) -> &mut [T] {
-        if index.start > index.end {
-            slice_index_order_fail(index.start, index.end);
-        } else if index.end > self.len() {
-            slice_index_len_fail(index.end, self.len());
-        }
+    fn index_mut(&mut self, index: R) -> &mut [T] {
+        let (start, end) = check_indices(index, self.len());
         unsafe {
             from_raw_parts_mut(
-                self.as_mut_ptr().offset(index.start as isize),
-                index.end - index.start
+                self.as_mut_ptr().offset(start as isize),
+                end - start
             )
         }
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<T> ops::IndexMut<ops::RangeTo<usize>> for [T] {
-    #[inline]
-    fn index_mut(&mut self, index: ops::RangeTo<usize>) -> &mut [T] {
-        self.index_mut(ops::Range{ start: 0, end: index.end })
-    }
-}
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<T> ops::IndexMut<ops::RangeFrom<usize>> for [T] {
-    #[inline]
-    fn index_mut(&mut self, index: ops::RangeFrom<usize>) -> &mut [T] {
-        let len = self.len();
-        self.index_mut(ops::Range{ start: index.start, end: len })
-    }
-}
-#[stable(feature = "rust1", since = "1.0.0")]
-impl<T> ops::IndexMut<RangeFull> for [T] {
-    #[inline]
-    fn index_mut(&mut self, _index: RangeFull) -> &mut [T] {
-        self
-    }
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Common traits

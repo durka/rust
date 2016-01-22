@@ -68,15 +68,13 @@ use core::hash::{self, Hash};
 use core::intrinsics::{arith_offset, assume, needs_drop};
 use core::iter::FromIterator;
 use core::mem;
-use core::ops::{Index, IndexMut};
+use core::ops::{Index, IndexMut, RangeArgument};
 use core::ops;
 use core::ptr;
 use core::slice;
 
 #[allow(deprecated)]
 use borrow::{Cow, IntoCow};
-
-use super::range::RangeArgument;
 
 /// A growable list type, written `Vec<T>` but pronounced 'vector.'
 ///
@@ -762,10 +760,10 @@ impl<T> Vec<T> {
         // the hole, and the vector length is restored to the new length.
         //
         let len = self.len();
-        let start = *range.start().unwrap_or(&0);
-        let end = *range.end().unwrap_or(&len);
-        assert!(start <= end);
-        assert!(end <= len);
+        let start = range.start().clamp_unchecked(0);
+        let end = range.end().clamp_unchecked(len);
+        assert!(start <= end, "drain lower bound was too large");
+        assert!(end <= len, "drain upper bound was too large");
 
         unsafe {
             // set self.vec length's to start, to be safe in case Drain is leaked

@@ -72,6 +72,8 @@ use fmt;
 use convert::From;
 use marker::{Sized, Unsize};
 use num::One;
+use result::Result;
+use result::Result::{Ok, Err};
 
 /// The `Drop` trait is used to run some code when a value goes out of scope.
 /// This is sometimes called a 'destructor'.
@@ -1956,3 +1958,134 @@ pub trait BoxPlace<Data: ?Sized> : Place<Data> {
     /// Creates a globally fresh place.
     fn make_place() -> Self;
 }
+
+
+
+/// Describes one end of a range
+#[unstable(feature = "collections_range",
+           reason = "waiting for dust to settle on inclusive ranges",
+           issue = "30877")]
+pub enum RangeBound<'a, T: 'a> {
+    /// Unbounded
+    Unbounded,
+    /// Open
+    Inclusive(&'a T),
+    /// Closed
+    Exclusive(&'a T),
+}
+
+/// **RangeArgument** is implemented by Rust's built-in range types, produced
+/// by range syntax like `..`, `a..`, `..b` or `c..d`.
+#[unstable(feature = "collections_range",
+           reason = "waiting for dust to settle on inclusive ranges",
+           issue = "30877")]
+pub trait RangeArgument<T> {
+    /// Start index (inclusive)
+    ///
+    /// Return start value if present, else `None`.
+    fn start(&self) -> RangeBound<T> {
+        RangeBound::Unbounded
+    }
+
+    /// End index (exclusive)
+    ///
+    /// Return end value if present, else `None`.
+    fn end(&self) -> RangeBound<T> {
+        RangeBound::Unbounded
+    }
+}
+
+// FIXME add inclusive ranges to RangeArgument
+
+#[unstable(feature = "collections_range",
+           reason = "waiting for dust to settle on inclusive ranges",
+           issue = "30877")]
+impl<T> RangeArgument<T> for RangeFull {}
+
+#[unstable(feature = "collections_range",
+           reason = "waiting for dust to settle on inclusive ranges",
+           issue = "30877")]
+impl<T> RangeArgument<T> for RangeFrom<T> {
+    fn start(&self) -> RangeBound<T> {
+        RangeBound::Inclusive(&self.start)
+    }
+}
+
+#[unstable(feature = "collections_range",
+           reason = "waiting for dust to settle on inclusive ranges",
+           issue = "30877")]
+impl<T> RangeArgument<T> for RangeTo<T> {
+    fn end(&self) -> RangeBound<T> {
+        RangeBound::Exclusive(&self.end)
+    }
+}
+
+#[unstable(feature = "collections_range",
+           reason = "waiting for dust to settle on inclusive ranges",
+           issue = "30877")]
+impl<T> RangeArgument<T> for Range<T> {
+    fn start(&self) -> RangeBound<T> {
+        RangeBound::Inclusive(&self.start)
+    }
+    fn end(&self) -> RangeBound<T> {
+        RangeBound::Exclusive(&self.end)
+    }
+}
+
+#[unstable(feature = "collections_range",
+           reason = "waiting for dust to settle on inclusive ranges",
+           issue = "30877")]
+impl<T> RangeArgument<T> for RangeToInclusive<T> {
+    fn end(&self) -> RangeBound<T> {
+        RangeBound::Inclusive(&self.end)
+    }
+}
+
+#[unstable(feature = "collections_range",
+           reason = "waiting for dust to settle on inclusive ranges",
+           issue = "30877")]
+impl<T> RangeArgument<T> for RangeInclusive<T> {
+    fn start(&self) -> RangeBound<T> {
+        match *self {
+            RangeInclusive::Empty { .. } => RangeBound::Unbounded,
+            RangeInclusive::NonEmpty { ref start, .. } => RangeBound::Inclusive(start),
+        }
+    }
+    fn end(&self) -> RangeBound<T> {
+        match *self {
+            RangeInclusive::Empty { .. } => RangeBound::Unbounded,
+            RangeInclusive::NonEmpty { ref end, .. } => RangeBound::Inclusive(end),
+        }
+    }
+}
+
+impl<'a> RangeBound<'a, usize> {
+    /// Check bound
+    #[unstable(feature = "collections_range",
+               reason = "waiting for dust to settle on inclusive ranges",
+               issue = "30877")]
+    #[inline]
+    pub fn bounds_check(self, len: usize, default: usize) -> Result<usize, RangeBound<'a, usize>> {
+        match self {
+            RangeBound::Unbounded                 => Ok(default),
+            RangeBound::Exclusive(&i) if i < len  => Ok(i+1),
+            RangeBound::Inclusive(&i) if i <= len => Ok(i),
+            b @ RangeBound::Inclusive(_)          => Err(b),
+            b @ RangeBound::Exclusive(_)          => Err(b),
+        }
+    }
+
+    /// Clamp bound but don't check
+    #[unstable(feature = "collections_range",
+               reason = "waiting for dust to settle on inclusive ranges",
+               issue = "30877")]
+    #[inline]
+    pub fn clamp_unchecked(self, default: usize) -> usize {
+        match self {
+            RangeBound::Unbounded     => default,
+            RangeBound::Exclusive(&i) => i.saturating_add(1),
+            RangeBound::Inclusive(&i) => i,
+        }
+    }
+}
+

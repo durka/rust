@@ -59,7 +59,7 @@ use core::fmt;
 use core::hash;
 use core::iter::FromIterator;
 use core::mem;
-use core::ops::{self, Add};
+use core::ops::{self, Add, RangeArgument};
 use core::ptr;
 use core::slice;
 use core::str::pattern::Pattern;
@@ -68,7 +68,6 @@ use rustc_unicode::str as unicode_str;
 
 #[allow(deprecated)]
 use borrow::{Cow, IntoCow};
-use range::RangeArgument;
 use str::{self, FromStr, Utf8Error, Chars};
 use vec::Vec;
 use boxed::Box;
@@ -1283,9 +1282,8 @@ impl String {
         // of the vector version. The data is just plain bytes.
         // Because the range removal happens in Drop, if the Drain iterator is leaked,
         // the removal will not happen.
-        let len = self.len();
-        let start = *range.start().unwrap_or(&0);
-        let end = *range.end().unwrap_or(&len);
+        let start = range.start().clamp_unchecked(0);
+        let end = range.end().clamp_unchecked(self.len());
 
         // Take out two simultaneous borrows. The &mut String won't be accessed
         // until iteration is over, in Drop.
