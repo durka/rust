@@ -68,7 +68,7 @@ use rustc_unicode::str as unicode_str;
 
 #[allow(deprecated)]
 use borrow::{Cow, IntoCow};
-use range::RangeArgument;
+use range::{RangeArgument, Bounded};
 use str::{self, FromStr, Utf8Error, Chars};
 use vec::Vec;
 use boxed::Box;
@@ -1284,8 +1284,8 @@ impl String {
         // Because the range removal happens in Drop, if the Drain iterator is leaked,
         // the removal will not happen.
         let len = self.len();
-        let start = *range.start().unwrap_or(&0);
-        let end = *range.end().unwrap_or(&len);
+        let start = *range.start().unwrap_or(Bounded::Closed(&0));
+        let end = *range.end().unwrap_or(Bounded::Open(&len));
 
         // Take out two simultaneous borrows. The &mut String won't be accessed
         // until iteration is over, in Drop.
@@ -1878,9 +1878,9 @@ pub struct Drain<'a> {
     /// Will be used as &'a mut String in the destructor
     string: *mut String,
     /// Start of part to remove
-    start: usize,
+    start: Bounded<usize>,
     /// End of part to remove
-    end: usize,
+    end: Bounded<usize>,
     /// Current remaining range to remove
     iter: Chars<'a>,
 }

@@ -56,9 +56,9 @@ pub fn main() {
     }
 
     // test collection indexing
-    let vec = (0...10).collect::<Vec<_>>();
+    let mut vec = (0...10).collect::<Vec<_>>();
     let slice: &[_] = &*vec;
-    let string = String::from("hello world");
+    let mut string = String::from("hello world");
     let stir = "hello world";
 
     assert_eq!(&vec[3...6], &[3, 4, 5, 6]);
@@ -72,6 +72,10 @@ pub fn main() {
 
     assert_eq!(&stir[3...6], "lo w");
     assert_eq!(&stir[ ...6], "hello w");
+
+    // Range*Inclusive implements RangeArgument, so we can try out drain()
+    assert_eq!(vec.drain(3...6).collect::<Vec<_>>(), vec![3, 4, 5, 6]);
+    assert_eq!(string.drain(...6).collect::<String>(), "hello w");
 
     // test the size hints and emptying
     let mut long = 0...255u8;

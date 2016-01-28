@@ -76,7 +76,7 @@ use core::slice;
 #[allow(deprecated)]
 use borrow::{Cow, IntoCow};
 
-use super::range::RangeArgument;
+use super::range::{RangeArgument, Bounded};
 
 /// A growable list type, written `Vec<T>` but pronounced 'vector.'
 ///
@@ -762,8 +762,8 @@ impl<T> Vec<T> {
         // the hole, and the vector length is restored to the new length.
         //
         let len = self.len();
-        let start = *range.start().unwrap_or(&0);
-        let end = *range.end().unwrap_or(&len);
+        let start = *range.start().unwrap_or(Bounded::Closed(&0));
+        let end = *range.end().unwrap_or(Bounded::Open(&len));
         assert!(start <= end);
         assert!(end <= len);
 
