@@ -11,7 +11,8 @@
 use deriving::generic::*;
 use deriving::generic::ty::*;
 
-use syntax::ast::{MetaItem, Expr, VariantData};
+use syntax::ast::{self, MetaItem, Expr, VariantData};
+use syntax::attr::{self, AttrMetaMethods};
 use syntax::codemap::Span;
 use syntax::ext::base::{ExtCtxt, Annotatable};
 use syntax::ext::build::AstBuilder;
@@ -24,13 +25,53 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                              item: &Annotatable,
                              push: &mut FnMut(Annotatable))
 {
+    // check if we can use a short form
+    //
+    // the short form is `fn clone(&self) -> Self { *self }`
+    //
+    // we can use the short form if:
+    // - the item is Copy (unfortunately, all we can check is whether it's also deriving Copy)
+    // - there are no generic parameters (after specialization this limitation can be removed)
+    //      if we used the short form with generics, we'd have to bound the generics with
+    //      Clone + Copy, and then there'd be no Clone impl at all if the user fills in something
+    //      that is Clone but not Copy. and until specialization we can't write both impls.
+    let bounds;
+    let substructure;
+    let nested_match;
+    match *item {
+        Annotatable::Item(ref item) => {
+            match item.node {
+                ast::ItemStruct(_, ast::Generics { ref ty_params, .. }) |
+                ast::ItemEnum(_, ast::Generics { ref ty_params, .. })
+                    if ty_params.is_empty() && attr::contains_name(&item.attrs, "derive_Copy") => {
+
+                    bounds = vec![Literal(path_std!(cx, core::marker::Copy))];
+                    substructure = combine_substructure(Box::new(|c, s, _| {
+                        cs_shallow_clone(c, s)
+                    }));
+                    nested_match = false;
+                }
+
+                _ => {
+                    bounds = vec![];
+                    substructure = combine_substructure(Box::new(|c, s, sub| {
+                        cs_deep_clone("Clone", c, s, sub)
+                    }));
+                    nested_match = true;
+                }
+            }
+        }
+
+        _ => cx.span_bug(span, "#[derive(Clone)] on trait item or impl item")
+    }
+
     let inline = cx.meta_word(span, InternedString::new("inline"));
     let attrs = vec!(cx.attribute(span, inline));
     let trait_def = TraitDef {
         span: span,
         attributes: Vec::new(),
         path: path_std!(cx, core::clone::Clone),
-        additional_bounds: Vec::new(),
+        additional_bounds: bounds,
         generics: LifetimeBounds::empty(),
         is_unsafe: false,
         methods: vec!(
@@ -38,13 +79,12 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                 name: "clone",
                 generics: LifetimeBounds::empty(),
                 explicit_self: borrowed_explicit_self(),
+                nested_match: nested_match,
                 args: Vec::new(),
                 ret_ty: Self_,
                 attributes: attrs,
                 is_unsafe: false,
-                combine_substructure: combine_substructure(Box::new(|c, s, sub| {
-                    cs_clone("Clone", c, s, sub)
-                })),
+                combine_substructure: substructure,
             }
         ),
         associated_types: Vec::new(),
@@ -53,7 +93,12 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
     trait_def.expand(cx, mitem, item, push)
 }
 
-fn cs_clone(
+fn cs_shallow_clone(cx: &mut ExtCtxt, trait_span: Span) -> P<Expr> {
+
+    cx.expr_deref(trait_span, cx.expr_self(trait_span))
+}
+
+fn cs_deep_clone(
     name: &str,
     cx: &mut ExtCtxt, trait_span: Span,
     substr: &Substructure) -> P<Expr> {
