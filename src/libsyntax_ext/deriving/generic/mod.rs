@@ -247,6 +247,10 @@ pub struct MethodDef<'a> {
     /// Option)
     pub explicit_self: Option<Option<PtrTy<'a>>>,
 
+    /// Whether the function structure is a nested `match` statement with the result of
+    /// combine_substructe() inside, or just the result of combine_substructure()
+    pub nested_match: bool,
+
     /// Arguments other than the self argument
     pub args: Vec<Ty<'a>>,
 
@@ -984,13 +988,16 @@ impl<'a> MethodDef<'a> {
             nonself_args,
             &Struct(struct_def, fields));
 
-        // make a series of nested matches, to destructure the
-        // structs. This is actually right-to-left, but it shouldn't
-        // matter.
-        for (arg_expr, pat) in self_args.iter().zip(patterns) {
-            body = cx.expr_match(trait_.span, arg_expr.clone(),
-                                     vec!( cx.arm(trait_.span, vec!(pat.clone()), body) ))
+        if self.nested_match {
+            // make a series of nested matches, to destructure the
+            // structs. This is actually right-to-left, but it shouldn't
+            // matter.
+            for (arg_expr, pat) in self_args.iter().zip(patterns) {
+                body = cx.expr_match(trait_.span, arg_expr.clone(),
+                                         vec!( cx.arm(trait_.span, vec!(pat.clone()), body) ))
+            }
         }
+
         body
     }
 
