@@ -19,7 +19,15 @@ struct A {
 #[allow(unused_qualifications)]
 impl ::clone::Clone for A {
     #[inline]
-    fn clone(&self) -> A { *self }
+    fn clone(&self) -> A {
+        if false {
+            match *self {
+                A { a: ref __self_0_0 } => A { a: ::clone::Clone::clone(&(*__self_0_0)), },
+            }
+        } else {
+            *self
+        }
+    }
 }
 #[automatically_derived]
 #[allow(unused_qualifications)]

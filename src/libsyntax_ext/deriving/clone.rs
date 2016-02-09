@@ -46,10 +46,13 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                     if ty_params.is_empty() && attr::contains_name(&item.attrs, "derive_Copy") => {
 
                     bounds = vec![Literal(path_std!(cx, core::marker::Copy))];
-                    substructure = combine_substructure(Box::new(|c, s, _| {
-                        cs_shallow_clone(c, s)
+                    substructure = combine_substructure(Box::new(|c, s, sub| {
+                        cs_deep_clone("Clone", c, s, sub)
                     }));
-                    nested_match = false;
+                    nested_match = enclose(|c, s, sub| {
+                        let inner = cs_shallow_clone(c, s);
+                        c.expr_if(s, c.expr_bool(span, false), sub, Some(inner))
+                    });
                 }
 
                 _ => {
@@ -57,7 +60,7 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                     substructure = combine_substructure(Box::new(|c, s, sub| {
                         cs_deep_clone("Clone", c, s, sub)
                     }));
-                    nested_match = true;
+                    nested_match = None;
                 }
             }
         }
