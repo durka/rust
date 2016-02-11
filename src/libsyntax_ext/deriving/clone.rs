@@ -11,7 +11,7 @@
 use deriving::generic::*;
 use deriving::generic::ty::*;
 
-use syntax::ast::{self, MetaItem, Expr, VariantData};
+use syntax::ast::{Expr, ItemKind, Generics, MetaItem, VariantData};
 use syntax::attr::{self, AttrMetaMethods};
 use syntax::codemap::Span;
 use syntax::ext::base::{ExtCtxt, Annotatable};
@@ -41,8 +41,8 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
     match *item {
         Annotatable::Item(ref item) => {
             match item.node {
-                ast::ItemStruct(_, ast::Generics { ref ty_params, .. }) |
-                ast::ItemEnum(_, ast::Generics { ref ty_params, .. })
+                ItemKind::Struct(_, Generics { ref ty_params, .. }) |
+                ItemKind::Enum(_, Generics { ref ty_params, .. })
                     if ty_params.is_empty() && attr::contains_name(&item.attrs, "derive_Copy") => {
 
                     bounds = vec![Literal(path_std!(cx, core::marker::Copy))];
