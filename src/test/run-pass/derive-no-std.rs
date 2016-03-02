@@ -8,12 +8,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(rand, collections, rustc_private)]
+#![feature(libc, lang_items, start)]
 #![no_std]
 
-extern crate rand;
-extern crate serialize as rustc_serialize;
-extern crate collections;
+extern crate libc; // to pull in libSystem on OSX
+
+#[lang = "panic_fmt"] fn panic_fmt() -> ! { loop {} }
+#[lang = "eh_personality"] extern fn eh_personality() {}
 
 // Issue #16803
 
@@ -32,8 +33,21 @@ enum Bar {
 
 enum Baz { A=0, B=5, }
 
-fn main() {
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord,
+         Debug, Copy)]
+enum Void {}
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord,
+         Debug, Copy)]
+struct Empty;
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord,
+         Debug, Copy)]
+struct AlsoEmpty {}
+
+#[start]
+fn main(argc: isize, argv: *const *const u8) -> isize {
     Foo { x: 0 };
     Bar::Quux(3);
     Baz::A;
+
+    0
 }
