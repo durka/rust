@@ -35,7 +35,10 @@ pub fn expand_deriving_partial_eq(cx: &mut ExtCtxt,
                     _ => cx.span_bug(span, "not exactly 2 arguments in `derive(PartialEq)`")
                 };
 
-                let eq = cx.expr_binary(span, BinOpKind::Eq, self_f, other_f.clone());
+                let eq = cx.expr_binary(span,
+                                        BinOpKind::Eq,
+                                        cx.expr_addr_of(span, self_f),
+                                        cx.expr_addr_of(span, other_f.clone()));
 
                 cx.expr_binary(span, BinOpKind::And, subexpr, eq)
             },
@@ -52,7 +55,10 @@ pub fn expand_deriving_partial_eq(cx: &mut ExtCtxt,
                     _ => cx.span_bug(span, "not exactly 2 arguments in `derive(PartialEq)`")
                 };
 
-                let eq = cx.expr_binary(span, BinOpKind::Ne, self_f, other_f.clone());
+                let eq = cx.expr_binary(span,
+                                        BinOpKind::Ne,
+                                        cx.expr_addr_of(span, self_f),
+                                        cx.expr_addr_of(span, other_f.clone()));
 
                 cx.expr_binary(span, BinOpKind::Or, subexpr, eq)
             },
