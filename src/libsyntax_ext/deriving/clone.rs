@@ -19,6 +19,8 @@ use syntax::ext::build::AstBuilder;
 use syntax::parse::token::InternedString;
 use syntax::ptr::P;
 
+enum Mode { Assert, Clone }
+
 pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                              span: Span,
                              mitem: &MetaItem,
@@ -39,25 +41,30 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
     let substructure;
     let nested_match;
     match *item {
-        Annotatable::Item(ref item) => {
-            match item.node {
+        Annotatable::Item(ref annitem) => {
+            match annitem.node {
                 ItemKind::Struct(_, Generics { ref ty_params, .. }) |
                 ItemKind::Enum(_, Generics { ref ty_params, .. })
-                    if ty_params.is_empty() && attr::contains_name(&item.attrs, "derive_Copy") => {
+                    if ty_params.is_empty()
+                        && attr::contains_name(&annitem.attrs, "derive_Copy") => {
 
                     bounds = vec![Literal(path_std!(cx, core::marker::Copy))];
-                    substructure = combine_substructure(Box::new(|c, s, _| {
-                        cs_shallow_clone(c, s)
+                    substructure = combine_substructure(Box::new(|c, s, sub| {
+                        cs_deep_clone("Clone", c, s, sub, Mode::Assert)
                     }));
-                    nested_match = false;
+                    nested_match = enclose(|c, s, sub| {
+                        let inner = cs_shallow_clone(c, s);
+                        c.expr_block(c.block_all(s, vec![c.stmt_expr(sub)], Some(inner)))
+                        //^ FIXME(aburka): this generates an extra set of {} braces
+                    });
                 }
 
                 _ => {
                     bounds = vec![];
                     substructure = combine_substructure(Box::new(|c, s, sub| {
-                        cs_deep_clone("Clone", c, s, sub)
+                        cs_deep_clone("Clone", c, s, sub, Mode::Clone)
                     }));
-                    nested_match = true;
+                    nested_match = None;
                 }
             }
         }
@@ -101,10 +108,14 @@ fn cs_shallow_clone(cx: &mut ExtCtxt, trait_span: Span) -> P<Expr> {
 fn cs_deep_clone(
     name: &str,
     cx: &mut ExtCtxt, trait_span: Span,
-    substr: &Substructure) -> P<Expr> {
+    substr: &Substructure,
+    mode: Mode) -> P<Expr> {
     let ctor_path;
     let all_fields;
-    let fn_path = cx.std_path(&["clone", "Clone", "clone"]);
+    let fn_path = match mode {
+        Mode::Assert => cx.std_path(&["clone", "assert_receiver_is_clone"]),
+        Mode::Clone  => cx.std_path(&["clone", "Clone", "clone"]),
+    };
     let subcall = |field: &FieldInfo| {
         let args = vec![cx.expr_addr_of(field.span, field.self_.clone())];
 
@@ -134,29 +145,41 @@ fn cs_deep_clone(
         }
     }
 
-    match *vdata {
-        VariantData::Struct(..) => {
-            let fields = all_fields.iter().map(|field| {
-                let ident = match field.name {
-                    Some(i) => i,
-                    None => {
-                        cx.span_bug(trait_span,
-                                    &format!("unnamed field in normal struct in \
-                                             `derive({})`", name))
-                    }
-                };
-                cx.field_imm(field.span, ident, subcall(field))
-            }).collect::<Vec<_>>();
+    match mode {
+        Mode::Assert => {
+            cx.expr_block(cx.block(trait_span,
+                                   all_fields.iter()
+                                             .map(subcall)
+                                             .map(|e| cx.stmt_expr(e))
+                                             .collect(),
+                                   None))
+        }
+        Mode::Clone => {
+            match *vdata {
+                VariantData::Struct(..) => {
+                    let fields = all_fields.iter().map(|field| {
+                        let ident = match field.name {
+                            Some(i) => i,
+                            None => {
+                                cx.span_bug(trait_span,
+                                            &format!("unnamed field in normal struct in \
+                                                     `derive({})`", name))
+                            }
+                        };
+                        cx.field_imm(field.span, ident, subcall(field))
+                    }).collect::<Vec<_>>();
 
-            cx.expr_struct(trait_span, ctor_path, fields)
-        }
-        VariantData::Tuple(..) => {
-            let subcalls = all_fields.iter().map(subcall).collect();
-            let path = cx.expr_path(ctor_path);
-            cx.expr_call(trait_span, path, subcalls)
-        }
-        VariantData::Unit(..) => {
-            cx.expr_path(ctor_path)
+                    cx.expr_struct(trait_span, ctor_path, fields)
+                }
+                VariantData::Tuple(..) => {
+                    let subcalls = all_fields.iter().map(subcall).collect();
+                    let path = cx.expr_path(ctor_path);
+                    cx.expr_call(trait_span, path, subcalls)
+                }
+                VariantData::Unit(..) => {
+                    cx.expr_path(ctor_path)
+                }
+            }
         }
     }
 }

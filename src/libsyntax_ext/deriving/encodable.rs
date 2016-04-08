@@ -149,7 +149,7 @@ fn expand_deriving_encodable_imp(cx: &mut ExtCtxt,
                                   vec![Path::new_(vec![krate, "Encoder"], None, vec!(), true)])]
                 },
                 explicit_self: borrowed_explicit_self(),
-                nested_match: true,
+                nested_match: None,
                 args: vec!(Ptr(Box::new(Literal(Path::new_local(typaram))),
                            Borrowed(None, Mutability::Mutable))),
                 ret_ty: Literal(Path::new_(

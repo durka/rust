@@ -249,7 +249,7 @@ pub struct MethodDef<'a> {
 
     /// Whether the function structure is a nested `match` statement with the result of
     /// combine_substructe() inside, or just the result of combine_substructure()
-    pub nested_match: bool,
+    pub nested_match: Option<RefCell<EncloseFunc<'a>>>,
 
     /// Arguments other than the self argument
     pub args: Vec<Ty<'a>>,
@@ -331,6 +331,9 @@ pub enum SubstructureFields<'a> {
 pub type CombineSubstructureFunc<'a> =
     Box<FnMut(&mut ExtCtxt, Span, &Substructure) -> P<Expr> + 'a>;
 
+pub type EncloseFunc<'a> =
+    Box<FnMut(&mut ExtCtxt, Span, P<Expr>) -> P<Expr> + 'a>;
+
 /// Deal with non-matching enum variants.  The tuple is a list of
 /// identifiers (one for each `Self` argument, which could be any of the
 /// variants since they have been collapsed together) and the identifiers
@@ -342,6 +345,13 @@ pub type EnumNonMatchCollapsedFunc<'a> =
 pub fn combine_substructure<'a>(f: CombineSubstructureFunc<'a>)
     -> RefCell<CombineSubstructureFunc<'a>> {
     RefCell::new(f)
+}
+
+pub fn enclose<'a, F>(f: F)
+    -> Option<RefCell<EncloseFunc<'a>>>
+    where F: FnMut(&mut ExtCtxt, Span, P<Expr>) -> P<Expr> + 'a
+{
+    Some(RefCell::new(Box::new(f)))
 }
 
 /// This method helps to extract all the type parameters referenced from a
@@ -861,7 +871,14 @@ impl<'a> MethodDef<'a> {
                      abi: Abi,
                      explicit_self: ast::ExplicitSelf,
                      arg_types: Vec<(Ident, P<ast::Ty>)> ,
-                     body: P<Expr>) -> ast::ImplItem {
+                     mut body: P<Expr>) -> ast::ImplItem {
+
+        if self.nested_match.is_some() {
+            let mut f = self.nested_match.as_ref().unwrap().borrow_mut();
+            let f: &mut _ = &mut *f;
+            body = f(cx, trait_.span, body);
+        }
+
         // create the generics that aren't for Self
         let fn_generics = self.generics.to_generics(cx, trait_.span, type_ident, generics);
 
@@ -988,14 +1005,12 @@ impl<'a> MethodDef<'a> {
             nonself_args,
             &Struct(struct_def, fields));
 
-        if self.nested_match {
-            // make a series of nested matches, to destructure the
-            // structs. This is actually right-to-left, but it shouldn't
-            // matter.
-            for (arg_expr, pat) in self_args.iter().zip(patterns) {
-                body = cx.expr_match(trait_.span, arg_expr.clone(),
-                                         vec!( cx.arm(trait_.span, vec!(pat.clone()), body) ))
-            }
+        // make a series of nested matches, to destructure the
+        // structs. This is actually right-to-left, but it shouldn't
+        // matter.
+        for (arg_expr, pat) in self_args.iter().zip(patterns) {
+            body = cx.expr_match(trait_.span, arg_expr.clone(),
+                                     vec!( cx.arm(trait_.span, vec!(pat.clone()), body) ))
         }
 
         body
