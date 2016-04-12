@@ -73,6 +73,15 @@ pub trait Clone : Sized {
     fn clone_from(&mut self, source: &Self) {
         *self = source.clone()
     }
+
+    // FIXME(aburka): this method is used solely by #[deriving] to
+    // assert that every component of a type implements Clone.
+    //
+    // This should never be implemented by hand.
+    #[doc(hidden)]
+    #[inline(always)]
+    #[stable(feature = "rust1", since = "1.0.0")]
+    fn assert_receiver_is_clone<T: Clone + ?Sized>(_: &T) {}
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]

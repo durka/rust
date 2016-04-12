@@ -47,82 +47,17 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
             match annitem.node {
                 ItemKind::Struct(_, Generics { ref ty_params, .. }) |
                 ItemKind::Enum(_, Generics { ref ty_params, .. })
-                    if ty_params.is_empty() && attr::contains_name(&annitem.attrs, "derive_Copy") => {
+                    if ty_params.is_empty()
+                        && attr::contains_name(&annitem.attrs, "derive_Copy") => {
 
                     bounds = vec![Literal(path_std!(cx, core::marker::Copy))];
                     substructure = combine_substructure(Box::new(|c, s, sub| {
                         cs_deep_clone("Clone", c, s, sub, Mode::Assert)
                     }));
                     nested_match = enclose(|c, s, sub| {
-                        let clone_path = c.path_global(s,
-                                                       pathvec_std!(c, core::clone::Clone)
-                                                           .iter()
-                                                           .map(|s| c.ident_of(s))
-                                                           .collect());
-                        let sized_path = c.path_global(s,
-                                                       pathvec_std!(c, core::marker::Sized)
-                                                           .iter()
-                                                           .map(|s| c.ident_of(s))
-                                                           .collect());
-                        let param_name = deriving::hygienic_type_parameter(item, "__T");
-                        let param_ident = c.ident_of(&param_name);
-                        let param_ty = c.ty_ident(s, param_ident);
-                        let param_generics = Generics {
-                            ty_params: P::from_vec(vec![
-                                TyParam {
-                                    ident: param_ident,
-                                    id: DUMMY_NODE_ID,
-                                    bounds: P::from_vec(vec![
-                                        TyParamBound::TraitTyParamBound(
-                                            PolyTraitRef {
-                                                bound_lifetimes: vec![],
-                                                trait_ref: TraitRef {
-                                                    path: clone_path,
-                                                    ref_id: DUMMY_NODE_ID
-                                                },
-                                                span: s
-                                            },
-                                            TraitBoundModifier::None
-                                        ),
-                                        TyParamBound::TraitTyParamBound(
-                                            PolyTraitRef {
-                                                bound_lifetimes: vec![],
-                                                trait_ref: TraitRef {
-                                                    path: sized_path,
-                                                    ref_id: DUMMY_NODE_ID
-                                                },
-                                                span: s
-                                            },
-                                            TraitBoundModifier::Maybe
-                                        )
-                                    ]),
-                                    default: None,
-                                    span: s
-                                }
-                            ]),
-                            .. Default::default()
-                        };
-                        let assert_fn = c.item_fn_poly(s,
-                                                       c.ident_of("__assert_clone"),
-                                                       vec![
-                                                           c.arg(s,
-                                                                 c.ident_of("_"),
-                                                                 c.ty_rptr(s,
-                                                                           param_ty,
-                                                                           None,
-                                                                           Mutability::Immutable))
-                                                       ],
-                                                       c.ty(s, TyKind::Tup(vec![])),
-                                                       param_generics,
-                                                       c.block(s, vec![], None));
-                        let assert_item = c.stmt_item(s, assert_fn);
                         let inner = cs_shallow_clone(c, s);
-                        c.expr_block(c.block_all(s,
-                                                 vec![
-                                                     assert_item,
-                                                     c.stmt_expr(sub)
-                                                 ],
-                                                 Some(inner)))
+                        c.expr_block(c.block_all(s, vec![c.stmt_expr(sub)], Some(inner)))
+                        //^ FIXME(aburka): this generates an extra set of {} braces
                     });
                 }
 
@@ -179,10 +114,13 @@ fn cs_deep_clone(
     mode: Mode) -> P<Expr> {
     let ctor_path;
     let all_fields;
-    let fn_path = match mode {
-        Mode::Assert => cx.path(trait_span, vec![cx.ident_of("__assert_clone")]),
-        Mode::Clone => cx.path_global(trait_span, cx.std_path(&["clone", "Clone", "clone"]))
-    };
+    let fn_path = cx.path_global(trait_span,
+                                 cx.std_path(&["clone",
+                                               "Clone",
+                                               match mode {
+                                                   Mode::Assert => "assert_receiver_is_clone",
+                                                   Mode::Clone => "clone"
+                                               }]));
     let subcall = |field: &FieldInfo| {
         let args = vec![cx.expr_addr_of(field.span, field.self_.clone())];
 
