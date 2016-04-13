@@ -8,12 +8,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use deriving;
 use deriving::generic::*;
 use deriving::generic::ty::*;
 
-use syntax::ast::{DUMMY_NODE_ID, Expr, ItemKind, Generics, MetaItem, Mutability, PolyTraitRef,
-                  TraitBoundModifier, TraitRef, TyKind, TyParam, TyParamBound, VariantData};
+use syntax::ast::{Expr, ItemKind, Generics, MetaItem, VariantData};
 use syntax::attr::{self, AttrMetaMethods};
 use syntax::codemap::Span;
 use syntax::ext::base::{ExtCtxt, Annotatable};
