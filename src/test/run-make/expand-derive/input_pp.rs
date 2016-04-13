@@ -22,7 +22,9 @@ impl ::clone::Clone for A {
     fn clone(&self) -> A {
         {
             match *self {
-                A { a: ref __self_0_0 } => { ::clone::assert_receiver_is_clone(&(*__self_0_0)); }
+                A { a: ref __self_0_0 } => {
+                    ::clone::assert_receiver_is_clone(&(*__self_0_0));
+                }
             };
             *self
         }
