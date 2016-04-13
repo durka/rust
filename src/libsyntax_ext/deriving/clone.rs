@@ -115,10 +115,11 @@ fn cs_deep_clone(
     let ctor_path;
     let all_fields;
     let fn_path = cx.path_global(trait_span,
-                                 cx.std_path(&match mode {
-                                     Mode::Assert => ["clone", "assert_receiver_is_clone"],
-                                     Mode::Clone => ["clone", "Clone", "clone"],
-                                 }));
+                                 match mode {
+                                     Mode::Assert => cx.std_path(["clone",
+                                                                  "assert_receiver_is_clone"]),
+                                     Mode::Clone  => cx.std_path(["clone", "Clone", "clone"]),
+                                 });
     let subcall = |field: &FieldInfo| {
         let args = vec![cx.expr_addr_of(field.span, field.self_.clone())];
 
