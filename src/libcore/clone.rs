@@ -82,7 +82,7 @@ pub trait Clone : Sized {
 #[doc(hidden)]
 #[inline(always)]
 #[stable(feature = "rust1", since = "1.0.0")]
-pub fn assert_receiver_is_clone<T: Clone + ?Sized>(_x: &T) {}
+pub fn assert_receiver_is_clone<T: Clone + ?Sized>(_: &T) {}
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T: ?Sized> Clone for &'a T {
