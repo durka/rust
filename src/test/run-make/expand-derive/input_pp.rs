@@ -21,11 +21,8 @@ impl ::clone::Clone for A {
     #[inline]
     fn clone(&self) -> A {
         {
-            fn __assert_clone<__T: ::clone::Clone + ?::marker::Sized>(_: &__T)
-             -> () {
-            }
             match *self {
-                A { a: ref __self_0_0 } => { __assert_clone(&(*__self_0_0)); }
+                A { a: ref __self_0_0 } => { ::clone::assert_receiver_is_clone(&(*__self_0_0)); }
             };
             *self
         }
