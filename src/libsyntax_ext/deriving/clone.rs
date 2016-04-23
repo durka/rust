@@ -122,7 +122,7 @@ fn cs_deep_clone(
 
         let span = if mode == Mode::Assert {
             // set the expn ID so we can call the unstable method
-            let span = Span { expn_id: cx.backtrace(), .. trait_span };
+            Span { expn_id: cx.backtrace(), .. trait_span }
         } else {
             field.span
         };
