@@ -247,10 +247,6 @@ pub struct MethodDef<'a> {
     /// Option)
     pub explicit_self: Option<Option<PtrTy<'a>>>,
 
-    /// Whether the function structure is a nested `match` statement with the result of
-    /// combine_substructe() inside, or just the result of combine_substructure()
-    pub nested_match: Option<RefCell<EncloseFunc<'a>>>,
-
     /// Arguments other than the self argument
     pub args: Vec<Ty<'a>>,
 
@@ -263,6 +259,10 @@ pub struct MethodDef<'a> {
     pub is_unsafe: bool,
 
     pub combine_substructure: RefCell<CombineSubstructureFunc<'a>>,
+
+    /// Optional method to munge the nested match expression containing the
+    /// results of combine_substructure()
+    pub enclose: Option<RefCell<EncloseFunc<'a>>>,
 }
 
 /// All the data about the data structure/method being derived upon.
@@ -331,6 +331,8 @@ pub enum SubstructureFields<'a> {
 pub type CombineSubstructureFunc<'a> =
     Box<FnMut(&mut ExtCtxt, Span, &Substructure) -> P<Expr> + 'a>;
 
+/// Munge the nested match expression containing the combined substructure.
+/// The last argument is the nested match expression.
 pub type EncloseFunc<'a> =
     Box<FnMut(&mut ExtCtxt, Span, P<Expr>) -> P<Expr> + 'a>;
 
@@ -800,6 +802,17 @@ impl<'a> MethodDef<'a> {
         f(cx, trait_.span, &substructure)
     }
 
+    fn call_enclose_method(&self,
+                           cx: &mut ExtCtxt,
+                           trait_: &TraitDef)
+        -> P<Expr> {
+        self.enclose.and_then(|enclose| {
+            let mut f = enclose.borrow_mut();
+            let f: &mut EncloseFunc = &mut *f;
+            f(cx, trait_.span, &substructure)
+        });
+    }
+
     fn get_ret_ty(&self,
                   cx: &mut ExtCtxt,
                   trait_: &TraitDef,
@@ -873,11 +886,7 @@ impl<'a> MethodDef<'a> {
                      arg_types: Vec<(Ident, P<ast::Ty>)> ,
                      mut body: P<Expr>) -> ast::ImplItem {
 
-        if self.nested_match.is_some() {
-            let mut f = self.nested_match.as_ref().unwrap().borrow_mut();
-            let f: &mut _ = &mut *f;
-            body = f(cx, trait_.span, body);
-        }
+        body = self.call_enclose_method(cx, trait_, body);
 
         // create the generics that aren't for Self
         let fn_generics = self.generics.to_generics(cx, trait_.span, type_ident, generics);

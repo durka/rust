@@ -39,7 +39,7 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
     //      that is Clone but not Copy. and until specialization we can't write both impls.
     let bounds;
     let substructure;
-    let nested_match;
+    let enclose;
     match *item {
         Annotatable::Item(ref annitem) => {
             match annitem.node {
@@ -52,7 +52,7 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                     substructure = combine_substructure(Box::new(|c, s, sub| {
                         cs_deep_clone("Clone", c, s, sub, Mode::Assert)
                     }));
-                    nested_match = enclose(|c, s, sub| {
+                    enclose = enclose(|c, s, sub| {
                         let inner = cs_shallow_clone(c, s);
                         c.expr_block(c.block_all(s, vec![c.stmt_expr(sub)], Some(inner)))
                         //^ FIXME(aburka): this generates an extra set of {} braces
@@ -64,7 +64,7 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                     substructure = combine_substructure(Box::new(|c, s, sub| {
                         cs_deep_clone("Clone", c, s, sub, Mode::Clone)
                     }));
-                    nested_match = None;
+                    enclose = None;
                 }
             }
         }
@@ -86,7 +86,7 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                 name: "clone",
                 generics: LifetimeBounds::empty(),
                 explicit_self: borrowed_explicit_self(),
-                nested_match: nested_match,
+                enclose: enclose,
                 args: Vec::new(),
                 ret_ty: Self_,
                 attributes: attrs,

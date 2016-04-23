@@ -73,7 +73,7 @@ fn expand_deriving_decodable_imp(cx: &mut ExtCtxt,
                                   vec![Path::new_(vec!(krate, "Decoder"), None, vec!(), true)])]
                 },
                 explicit_self: None,
-                nested_match: None,
+                enclose: None,
                 args: vec!(Ptr(Box::new(Literal(Path::new_local(typaram))),
                            Borrowed(None, Mutability::Mutable))),
                 ret_ty: Literal(Path::new_(
