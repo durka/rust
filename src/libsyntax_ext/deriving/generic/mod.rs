@@ -809,7 +809,7 @@ impl<'a> MethodDef<'a> {
         -> P<Expr> {
         match self.enclose {
             None => body,
-            Some(enclose) => {
+            Some(ref enclose) => {
                 let mut f = enclose.borrow_mut();
                 let f: &mut EncloseFunc = &mut *f;
                 f(cx, trait_.span, body)
