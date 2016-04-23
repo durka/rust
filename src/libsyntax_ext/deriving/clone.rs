@@ -152,12 +152,14 @@ fn cs_deep_clone(
     }
 
     match mode {
-        Mode::Assert => cx.expr_block(cx.block(span,
-                                               all_fields.iter()
-                                                         .map(subcall)
-                                                         .map(|e| cx.stmt_expr(e))
-                                                         .collect(),
-                                               None))
+        Mode::Assert => {
+            cx.expr_block(cx.block(span,
+                                   all_fields.iter()
+                                             .map(subcall)
+                                             .map(|e| cx.stmt_expr(e))
+                                             .collect(),
+                                   None))
+        }
         Mode::Clone => {
             match *vdata {
                 VariantData::Struct(..) => {
