@@ -811,7 +811,7 @@ impl<'a> MethodDef<'a> {
             let mut f = enclose.borrow_mut();
             let f: &mut EncloseFunc = &mut *f;
             f(cx, trait_.span, body)
-        });
+        })
     }
 
     fn get_ret_ty(&self,
