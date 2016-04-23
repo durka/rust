@@ -119,6 +119,12 @@ fn cs_deep_clone(
     let subcall = |field: &FieldInfo| {
         let args = vec![cx.expr_addr_of(field.span, field.self_.clone())];
 
+        let span = if mode == Mode::Assert {
+            // set the expn ID so we can call the unstable method
+            let span = Span { expn_id: cx.backtrace(), .. trait_span };
+        } else {
+            field.span
+        };
         cx.expr_call_global(field.span, fn_path.clone(), args)
     };
 
@@ -146,18 +152,12 @@ fn cs_deep_clone(
     }
 
     match mode {
-        Mode::Assert => {
-            // set the expn ID so we can call the unstable method
-            let span = Span { expn_id: cx.backtrace(), .. trait_span };
-
-            // generate the method calls
-            cx.expr_block(cx.block(span,
-                                   all_fields.iter()
-                                             .map(subcall)
-                                             .map(|e| cx.stmt_expr(e))
-                                             .collect(),
-                                   None))
-        }
+        Mode::Assert => cx.expr_block(cx.block(span,
+                                               all_fields.iter()
+                                                         .map(subcall)
+                                                         .map(|e| cx.stmt_expr(e))
+                                                         .collect(),
+                                               None))
         Mode::Clone => {
             match *vdata {
                 VariantData::Struct(..) => {
