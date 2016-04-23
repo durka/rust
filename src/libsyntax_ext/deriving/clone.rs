@@ -39,7 +39,7 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
     //      that is Clone but not Copy. and until specialization we can't write both impls.
     let bounds;
     let substructure;
-    let enclose;
+    let enclosefn;
     match *item {
         Annotatable::Item(ref annitem) => {
             match annitem.node {
@@ -52,7 +52,7 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                     substructure = combine_substructure(Box::new(|c, s, sub| {
                         cs_deep_clone("Clone", c, s, sub, Mode::Assert)
                     }));
-                    enclose = enclose(|c, s, sub| {
+                    enclosefn = enclose(|c, s, sub| {
                         let inner = cs_shallow_clone(c, s);
                         c.expr_block(c.block_all(s, vec![c.stmt_expr(sub)], Some(inner)))
                         //^ FIXME(aburka): this generates an extra set of {} braces
@@ -64,7 +64,7 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                     substructure = combine_substructure(Box::new(|c, s, sub| {
                         cs_deep_clone("Clone", c, s, sub, Mode::Clone)
                     }));
-                    enclose = None;
+                    enclosefn = None;
                 }
             }
         }
@@ -86,7 +86,7 @@ pub fn expand_deriving_clone(cx: &mut ExtCtxt,
                 name: "clone",
                 generics: LifetimeBounds::empty(),
                 explicit_self: borrowed_explicit_self(),
-                enclose: enclose,
+                enclose: enclosefn,
                 args: Vec::new(),
                 ret_ty: Self_,
                 attributes: attrs,
@@ -147,7 +147,11 @@ fn cs_deep_clone(
 
     match mode {
         Mode::Assert => {
-            cx.expr_block(cx.block(trait_span,
+            // set the expn ID so we can call the unstable method
+            let span = Span { expn_id: cx.backtrace(), .. span };
+
+            // generate the method calls
+            cx.expr_block(cx.block(span,
                                    all_fields.iter()
                                              .map(subcall)
                                              .map(|e| cx.stmt_expr(e))

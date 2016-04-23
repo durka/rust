@@ -804,12 +804,13 @@ impl<'a> MethodDef<'a> {
 
     fn call_enclose_method(&self,
                            cx: &mut ExtCtxt,
-                           trait_: &TraitDef)
+                           trait_: &TraitDef,
+                           body: P<Expr>)
         -> P<Expr> {
         self.enclose.and_then(|enclose| {
             let mut f = enclose.borrow_mut();
             let f: &mut EncloseFunc = &mut *f;
-            f(cx, trait_.span, &substructure)
+            f(cx, trait_.span, body)
         });
     }
 
@@ -884,9 +885,9 @@ impl<'a> MethodDef<'a> {
                      abi: Abi,
                      explicit_self: ast::ExplicitSelf,
                      arg_types: Vec<(Ident, P<ast::Ty>)> ,
-                     mut body: P<Expr>) -> ast::ImplItem {
+                     body: P<Expr>) -> ast::ImplItem {
 
-        body = self.call_enclose_method(cx, trait_, body);
+        let body = self.call_enclose_method(cx, trait_, body);
 
         // create the generics that aren't for Self
         let fn_generics = self.generics.to_generics(cx, trait_.span, type_ident, generics);
