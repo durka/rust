@@ -153,7 +153,7 @@ fn cs_deep_clone(
 
     match mode {
         Mode::Assert => {
-            cx.expr_block(cx.block(span,
+            cx.expr_block(cx.block(trait_span,
                                    all_fields.iter()
                                              .map(subcall)
                                              .map(|e| cx.stmt_expr(e))
