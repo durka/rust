@@ -19,6 +19,7 @@ use syntax::ext::build::AstBuilder;
 use syntax::parse::token::InternedString;
 use syntax::ptr::P;
 
+#[derive(PartialEq)]
 enum Mode { Assert, Clone }
 
 pub fn expand_deriving_clone(cx: &mut ExtCtxt,
