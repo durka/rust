@@ -807,11 +807,14 @@ impl<'a> MethodDef<'a> {
                            trait_: &TraitDef,
                            body: P<Expr>)
         -> P<Expr> {
-        self.enclose.map_or(body, |enclose| {
-            let mut f = enclose.borrow_mut();
-            let f: &mut EncloseFunc = &mut *f;
-            f(cx, trait_.span, body)
-        })
+        match self.enclose {
+            None => body,
+            Some(enclose) => {
+                let mut f = enclose.borrow_mut();
+                let f: &mut EncloseFunc = &mut *f;
+                f(cx, trait_.span, body)
+            }
+        }
     }
 
     fn get_ret_ty(&self,
