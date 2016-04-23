@@ -126,7 +126,7 @@ fn cs_deep_clone(
         } else {
             field.span
         };
-        cx.expr_call_global(field.span, fn_path.clone(), args)
+        cx.expr_call_global(span, fn_path.clone(), args)
     };
 
     let vdata;
