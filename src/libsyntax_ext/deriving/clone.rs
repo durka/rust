@@ -148,7 +148,7 @@ fn cs_deep_clone(
     match mode {
         Mode::Assert => {
             // set the expn ID so we can call the unstable method
-            let span = Span { expn_id: cx.backtrace(), .. span };
+            let span = Span { expn_id: cx.backtrace(), .. trait_span };
 
             // generate the method calls
             cx.expr_block(cx.block(span,

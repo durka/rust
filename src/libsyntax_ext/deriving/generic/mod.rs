@@ -807,7 +807,7 @@ impl<'a> MethodDef<'a> {
                            trait_: &TraitDef,
                            body: P<Expr>)
         -> P<Expr> {
-        self.enclose.and_then(|enclose| {
+        self.enclose.map_or(body, |enclose| {
             let mut f = enclose.borrow_mut();
             let f: &mut EncloseFunc = &mut *f;
             f(cx, trait_.span, body)
