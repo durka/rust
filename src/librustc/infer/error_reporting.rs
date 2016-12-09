@@ -568,17 +568,27 @@ impl<'a, 'gcx, 'tcx> InferCtxt<'a, 'gcx, 'tcx> {
                 false
             };
 
+            let mut noted = false;
+
             if !is_simple_error {
                 if expected == found {
                     if let &TypeError::Sorts(ref values) = terr {
+                        noted = true;
                         diag.note_expected_found_extra(
                             &"type", &expected, &found,
                             &format!(" ({})", values.expected.sort_string(self.tcx)),
                             &format!(" ({})", values.found.sort_string(self.tcx)));
-                    } else {
-                        diag.note_expected_found(&"type", &expected, &found);
                     }
-                } else {
+                } else if let &TypeError::Sorts(ref values) = terr {
+                    if let ty::TyAdt(&ty::AdtDef { ref did, .. }, _) = values.found.sty {
+                        if Some(did) == self.tcx.lang_items.result_type().as_ref() {
+                            noted = true;
+                            diag.note("`try!` and `?` can only be used in a function that returns a `Result`");
+                        }
+                    }
+                }
+
+                if !noted {
                     diag.note_expected_found(&"type", &expected, &found);
                 }
             }

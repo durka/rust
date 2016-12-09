@@ -2813,6 +2813,7 @@ pub trait BoxPlace<Data: ?Sized> : Place<Data> {
 /// should not rely on any implementations of `Carrier` other than `Result`,
 /// i.e., you should not expect `?` to continue to work with `Option`, etc.
 #[unstable(feature = "question_mark_carrier", issue = "31436")]
+#[cfg_attr(not(stage0), lang = "carrier")]
 pub trait Carrier {
     /// The type of the value when computation succeeds.
     type Success;

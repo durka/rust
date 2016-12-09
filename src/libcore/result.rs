@@ -257,6 +257,7 @@ use iter::{FromIterator, FusedIterator, TrustedLen};
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 #[must_use]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[cfg_attr(not(stage0), lang = "result")]
 pub enum Result<T, E> {
     /// Contains the success value
     #[stable(feature = "rust1", since = "1.0.0")]
