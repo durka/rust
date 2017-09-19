@@ -15,6 +15,7 @@
 //! [`std::slice`]: ../../std/slice/index.html
 
 #![stable(feature = "rust1", since = "1.0.0")]
+#![allow(deprecated)] // SNAP change all ... to ..= and remove this once ..= is parseable
 
 // How this module is organized.
 //
