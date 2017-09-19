@@ -393,7 +393,7 @@ impl Error {
             Error::InclusiveRangeWithNoEnd => {
                 let mut err = struct_span_err!(handler, sp, E0586,
                                                "inclusive range with no end");
-                err.help("inclusive ranges must be bounded at the end (`...b` or `a...b`)");
+                err.help("inclusive ranges must be bounded at the end (`..=b` or `a..=b`)");
                 err
             }
         }
@@ -2763,7 +2763,7 @@ impl<'a> Parser<'a> {
                 LhsExpr::AttributesParsed(attrs) => Some(attrs),
                 _ => None,
             };
-            if self.token == token::DotDot || self.token == token::DotDotDot {
+            if [token::DotDot, token::DotDotDot, token::DotDotEquals].contains(&self.token) {
                 return self.parse_prefix_range_expr(attrs);
             } else {
                 self.parse_prefix_expr(attrs)?
@@ -2806,12 +2806,13 @@ impl<'a> Parser<'a> {
                 let rhs = self.parse_ty_no_plus()?;
                 lhs = self.mk_expr(lhs_span.to(rhs.span), ExprKind::Type(lhs, rhs), ThinVec::new());
                 continue
-            } else if op == AssocOp::DotDot || op == AssocOp::DotDotDot {
-                // If we didn’t have to handle `x..`/`x...`, it would be pretty easy to
+            } else if op == AssocOp::DotDot || op == AssocOp::DotDotEquals {
+                // If we didn’t have to handle `x..`/`x..=`, it would be pretty easy to
                 // generalise it to the Fixity::None code.
                 //
-                // We have 2 alternatives here: `x..y`/`x...y` and `x..`/`x...` The other
+                // We have 2 alternatives here: `x..y`/`x..=y` and `x..`/`x..=` The other
                 // two variants are handled with `parse_prefix_range_expr` call above.
+                // (and `x...y`/`x...` until SNAP)
                 let rhs = if self.is_at_start_of_range_notation_rhs() {
                     Some(self.parse_assoc_expr_with(op.precedence() + 1,
                                                     LhsExpr::NotYetParsed)?)
@@ -2888,8 +2889,8 @@ impl<'a> Parser<'a> {
                     let aopexpr = self.mk_assign_op(codemap::respan(cur_op_span, aop), lhs, rhs);
                     self.mk_expr(span, aopexpr, ThinVec::new())
                 }
-                AssocOp::As | AssocOp::Colon | AssocOp::DotDot | AssocOp::DotDotDot => {
-                    self.bug("As, Colon, DotDot or DotDotDot branch reached")
+                AssocOp::As | AssocOp::Colon | AssocOp::DotDot | AssocOp::DotDotEquals => {
+                    self.bug("AssocOp should have been handled by special case")
                 }
             };
 
@@ -2985,12 +2986,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parse prefix-forms of range notation: `..expr`, `..`, `...expr`
+    /// Parse prefix-forms of range notation: `..expr`, `..`, `..=expr` (and `...expr` until SNAP)
     fn parse_prefix_range_expr(&mut self,
                                already_parsed_attrs: Option<ThinVec<Attribute>>)
                                -> PResult<'a, P<Expr>> {
-        debug_assert!(self.token == token::DotDot || self.token == token::DotDotDot,
-                      "parse_prefix_range_expr: token {:?} is not DotDot or DotDotDot",
+        // SNAP remove DotDotDot
+        debug_assert!([token::DotDot, token::DotDotDot, token::DotDotEquals].contains(&self.token),
+                      "parse_prefix_range_expr: token {:?} is not DotDot/DotDotDot/DotDotEquals",
                       self.token);
         let tok = self.token.clone();
         let attrs = self.parse_or_use_outer_attributes(already_parsed_attrs)?;
@@ -3466,7 +3468,7 @@ impl<'a> Parser<'a> {
     fn parse_as_ident(&mut self) -> bool {
         self.look_ahead(1, |t| match *t {
             token::OpenDelim(token::Paren) | token::OpenDelim(token::Brace) |
-            token::DotDotDot | token::ModSep | token::Not => Some(false),
+            token::DotDotDot | token::DotDotEquals | token::ModSep | token::Not => Some(false),
             // ensure slice patterns [a, b.., c] and [a, b, c..] don't go into the
             // range pattern branch
             token::DotDot => None,
@@ -3550,11 +3552,15 @@ impl<'a> Parser<'a> {
                         let mac = respan(lo.to(self.prev_span), Mac_ { path: path, tts: tts });
                         pat = PatKind::Mac(mac);
                     }
-                    token::DotDotDot | token::DotDot => {
+                    token::DotDotDot | token::DotDotEquals | token::DotDot => {
                         let end_kind = match self.token {
                             token::DotDot => RangeEnd::Excluded,
-                            token::DotDotDot => RangeEnd::Included,
-                            _ => panic!("can only parse `..` or `...` for ranges (checked above)"),
+                            token::DotDotDot => {
+                                self.warn_dotdoteq();
+                                RangeEnd::Included
+                            }
+                            token::DotDotEquals => RangeEnd::Included,
+                            _ => panic!("can only parse `..`/`...`/`..=` for ranges (checked above)"),
                         };
                         // Parse range
                         let span = lo.to(self.prev_span);
@@ -3594,6 +3600,10 @@ impl<'a> Parser<'a> {
                 match self.parse_pat_literal_maybe_minus() {
                     Ok(begin) => {
                         if self.eat(&token::DotDotDot) {
+                            let end = self.parse_pat_range_end()?;
+                            pat = PatKind::Range(begin, end, RangeEnd::Included);
+                        } else if self.eat(&token::DotDotEquals) {
+                            self.warn_dotdoteq();
                             let end = self.parse_pat_range_end()?;
                             pat = PatKind::Range(begin, end, RangeEnd::Included);
                         } else if self.eat(&token::DotDot) {
@@ -3979,7 +3989,7 @@ impl<'a> Parser<'a> {
                     token::BinOp(token::Minus) | token::BinOp(token::Star) |
                     token::BinOp(token::And) | token::BinOp(token::Or) |
                     token::AndAnd | token::OrOr |
-                    token::DotDot | token::DotDotDot => false,
+                    token::DotDot | token::DotDotDot | token::DotDotEquals => false,
                     _ => true,
                 } {
                     self.warn_missing_semicolon();
@@ -4198,6 +4208,12 @@ impl<'a> Parser<'a> {
             &format!("expected `;`, found `{}`", self.this_token_to_string())
         }).note({
             "This was erroneously allowed and will become a hard error in a future release"
+        }).emit();
+    }
+
+    fn warn_dotdoteq(&self) {
+        self.diagnostic().struct_span_warn(self.span, {
+            "`...` is being replaced by `..=`"
         }).emit();
     }
 
