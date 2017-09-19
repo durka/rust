@@ -1,4 +1,4 @@
-// Copyright 2016 The Rust Project Developers. See the COPYRIGHT
+// Copyright 2017 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -8,16 +8,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-// Test that you only need the syntax gate if you don't mention the structs.
-
-#![feature(inclusive_range_syntax)]
+// Test old and new syntax for inclusive range patterns.
 
 fn main() {
-    let mut count = 0;
-    for i in 0_usize..=10 {
-        assert!(i >= 0 && i <= 10);
-        count += i;
-    }
-    assert_eq!(count, 55);
+    assert!(match 42 { 0 ... 100 => true, _ => false });
+    assert!(match 42 { 0 ..= 100 => true, _ => false });
+
+    assert!(match 'x' { 'a' ... 'z' => true, _ => false });
+    assert!(match 'x' { 'a' ..= 'z' => true, _ => false });
 }
 
